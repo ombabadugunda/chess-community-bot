@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GameResult {
+  A_WIN
+  B_WIN
+  DRAW
+}
+
+enum GameStatus {
+  PENDING
+  CONFIRMED
+  DISPUTED
+  CANCELLED
+}
+
+enum TimeControl {
+  blitz
+  rapid
+  classical
+}
+
+model Player {
+  id              String   @id @default(uuid())
+  telegramId      String   @unique
+  nickname        String
+  status          String   @default("active")
+  createdAt       DateTime @default(now())
+
+  gamesAsA        Game[]   @relation("playerA")
+  gamesAsB        Game[]   @relation("playerB")
+  ratingChanges   RatingChange[]
+
+  currentElo       Int      @default(1200)
+  gamesPlayed      Int      @default(0)
+}
+
+model Game {
+  id             String      @id @default(uuid())
+  playerAId      String
+  playerBId      String
+  result         GameResult
+  status         GameStatus  @default(PENDING)
+  timeControl    TimeControl?
+  reportedBy     String
+  confirmedBy    String?
+  createdAt      DateTime    @default(now())
+  playedAt       DateTime    @default(now())
+
+  playerA        Player      @relation("playerA", fields: [playerAId], references: [id])
+  playerB        Player      @relation("playerB", fields: [playerBId], references: [id])
+  ratingChanges  RatingChange[]
+}
+
+model RatingChange {
+  id         String   @id @default(uuid())
+  gameId     String
+  playerId   String
+  eloBefore  Int
+  eloAfter   Int
+  delta      Int
+  createdAt  DateTime @default(now())
+
+  game       Game     @relation(fields: [gameId], references: [id])
+  player     Player   @relation(fields: [playerId], references: [id])
+
+  @@index([playerId, createdAt])
+  @@index([gameId])
+}

@@ -1,0 +1,21 @@
+{
+  "name": "chess-community-bot",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "dev:infra": "docker compose up -d",
+    "dev:prep": "pnpm db:migrate",
+    "dev:stack": "pnpm dev:infra && pnpm dev:prep && concurrently -n SHARED,API,BOT \"pnpm --filter @chess/shared dev\" \"pnpm --filter @chess/api dev\" \"pnpm --filter @chess/bot dev\"",
+    "stop:infra": "docker compose down",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "db:generate": "pnpm --filter @chess/db prisma:generate",
+    "db:migrate": "pnpm --filter @chess/db prisma:migrate",
+    "db:studio": "pnpm --filter @chess/db prisma:studio"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

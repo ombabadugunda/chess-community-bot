@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Player" ADD COLUMN     "currentElo" INTEGER NOT NULL DEFAULT 1200,
+ADD COLUMN     "gamesPlayed" INTEGER NOT NULL DEFAULT 0;
