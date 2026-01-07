@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import { z } from "zod";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { RegisterPlayerSchema, ReportGameSchema } from "@chess/shared";
 import { ConfirmGameSchema, DisputeGameSchema } from "@chess/shared";
 import { applyElo } from "./elo.js";
@@ -137,7 +137,7 @@ app.post("/games/:id/confirm", async (req, reply) => {
     result: game.result as any
   });
 
-  const updated = await prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     // 1) confirm game (щоб не підтвердили двічі паралельно)
     const g = await tx.game.update({
       where: { id: gameId },
@@ -257,7 +257,7 @@ app.get("/players/:id/history", async (req, reply) => {
   });
 
   // Нормалізуємо відповідь для UI
-  const items = games.map((g) => {
+  const items = games.map((g: (typeof games)[number]) => {
     const isA = g.playerAId === playerId;
     const me = isA ? g.playerA : g.playerB;
     const opp = isA ? g.playerB : g.playerA;
