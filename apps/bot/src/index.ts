@@ -62,7 +62,7 @@ async function registerConversation(conversation: any, ctx: MyContext) {
   const telegramId = String(ctx.from?.id ?? "");
   if (!telegramId) return ctx.reply("Не бачу твій Telegram ID.");
 
-  await ctx.reply("Введи свій нік (як у клубі):");
+  await ctx.reply("Введи свій нік:");
   const m = await conversation.wait();
   const nickname = (m.message?.text ?? "").trim();
 
@@ -174,7 +174,7 @@ bot.use(createConversation(reportConversation));
 
 // commands
 bot.command("start", async (ctx) => {
-  await ctx.reply("Привіт! Команди:\n/register\n/report\n/leaderboard\n/history\n/myid");
+  await ctx.reply("Привіт! Вітаю в спільноті SISCA! Ми тут в Сквоті постійно граємо в шахи один з одним і вирішили об'єднати всіх одним ком'юніті та одним рейтингом. Правила прості: граєш гру в Сквоті, заносиш результат за допомогою /report.\nОбидва гравці мають бути зареєстровані через /register.\n Також можна подивитись /leaderboard та /history\n За всіма питаннями звертайся до @ombabadugunda");
 });
 
 bot.command("help", async (ctx) => {
