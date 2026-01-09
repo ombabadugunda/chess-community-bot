@@ -241,22 +241,27 @@ bot.callbackQuery(/^game:confirm:/, async (ctx) => {
   const telegramId = String(ctx.from?.id ?? "");
 
   try {
-    const updated = await confirmGame(gameId, telegramId); // { game, rating }
+    const updated = await confirmGame(gameId, telegramId); // очікуємо { game, rating }
 
+    // 1) Прибираємо кнопки / фіксуємо повідомлення
     await ctx.editMessageText("Гру підтверджено ✅");
 
-    await notifyModerator(
-      ctx,
-      `♟️ Game confirmed\n• ${updated.game.playerA.nickname} vs ${updated.game.playerB.nickname}\n• result: ${updated.game.result}\n• id: ${updated.game.id}\n• at: ${new Date().toISOString()}`
-    );
-
+    // 2) Нотифікація репортеру (як у нас було)
     const reporterTgId = Number(updated.game.playerA.telegramId);
     await ctx.api.sendMessage(
       reporterTgId,
       `✅ ${updated.game.playerB.nickname} підтвердив(ла) гру.\n` +
-        `Новий рейтинг:\n` +
-        `• ${updated.game.playerA.nickname}: ${updated.rating.newA} (${updated.rating.deltaA >= 0 ? "+" : ""}${updated.rating.deltaA})\n` +
-        `• ${updated.game.playerB.nickname}: ${updated.rating.newB} (${updated.rating.deltaB >= 0 ? "+" : ""}${updated.rating.deltaB})`
+      `Новий рейтинг:\n` +
+      `• ${updated.game.playerA.nickname}: ${updated.rating.newA} (${updated.rating.deltaA >= 0 ? "+" : ""}${updated.rating.deltaA})\n` +
+      `• ${updated.game.playerB.nickname}: ${updated.rating.newB} (${updated.rating.deltaB >= 0 ? "+" : ""}${updated.rating.deltaB})`
+    );
+
+    // 3) ✅ НОВЕ: нотифікація людині, яка підтвердила (опоненту)
+    await ctx.reply(
+      `✅ Ти підтвердив(ла) гру.\n` +
+      `Матч: ${updated.game.playerA.nickname} vs ${updated.game.playerB.nickname}\n` +
+      `Результат: ${prettyResult(updated.game.result)}\n` +
+      `Твій рейтинг: ${updated.game.playerB.currentElo} (${updated.rating.deltaB >= 0 ? "+" : ""}${updated.rating.deltaB})`
     );
   } catch (e: any) {
     await ctx.answerCallbackQuery({ text: `Не вийшло: ${e.message}`, show_alert: true });
@@ -268,24 +273,28 @@ bot.callbackQuery(/^game:dispute:/, async (ctx) => {
   const telegramId = String(ctx.from?.id ?? "");
 
   try {
-    const updated = await disputeGame(gameId, telegramId); // { game, ... }
+    const updated = await disputeGame(gameId, telegramId);
 
-    await ctx.editMessageText("Гру позначено як спірну ⚠️ (піде на модерацію)");
+    await ctx.editMessageText("Гру позначено як спірну ⚠️");
 
-    await notifyModerator(
-      ctx,
-      `⚠️ Game disputed\n• ${updated.game.playerA.nickname} vs ${updated.game.playerB.nickname}\n• id: ${updated.game.id}\n• at: ${new Date().toISOString()}`
-    );
-
-    const reporterTgId = Number(updated.game.playerA.telegramId);
+    const reporterTgId = Number(updated.playerA.telegramId);
     await ctx.api.sendMessage(
       reporterTgId,
-      `⚠️ ${updated.game.playerB.nickname} заперечив(ла) гру.\nID: ${updated.game.id}\n(Далі: модерація/уточнення)`
+      `⚠️ ${updated.playerB.nickname} заперечив(ла) гру.\nID: ${updated.id}`
+    );
+
+    // ✅ НОВЕ: нотифікація тому, хто натиснув dispute
+    await ctx.reply(
+      `⚠️ Ти заперечив(ла) гру.\n` +
+      `Матч: ${updated.playerA.nickname} vs ${updated.playerB.nickname}\n` +
+      `ID: ${updated.id}\n` +
+      `Далі: модерація/уточнення.`
     );
   } catch (e: any) {
     await ctx.answerCallbackQuery({ text: `Не вийшло: ${e.message}`, show_alert: true });
   }
 });
+
 
 async function ensurePollingMode() {
   try {
