@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { Bot, Context, InlineKeyboard, session } from "grammy";
+import { Keyboard, Bot, Context, InlineKeyboard, session } from "grammy";
 import { conversations, createConversation, ConversationFlavor } from "@grammyjs/conversations";
 
 import {
@@ -19,12 +19,31 @@ type MyContext = Context & ConversationFlavor & { session: SessionData };
 const token = process.env.BOT_TOKEN;
 if (!token) throw new Error("BOT_TOKEN is missing. Set it in apps/bot/.env");
 
+const mainMenu = new Keyboard()
+  .text("📝 Реєстрація").row()
+  .text("♟️ Занести гру").row()
+  .text("🏆 Рейтинг").text("📜 Історія")
+  .resized()
+  .persistent(); // важливо: робить клавіатуру “постійною”
+
 const MOD_CHAT_ID = process.env.MOD_CHAT_ID ? Number(process.env.MOD_CHAT_ID) : null;
 
 const bot = new Bot<MyContext>(token);
 
 bot.use(session({ initial: (): SessionData => ({}) }));
 bot.use(conversations());
+
+await bot.api.setMyCommands([
+  { command: "start", description: "Показати меню" },
+  { command: "register", description: "Реєстрація гравця" },
+  { command: "report", description: "Занести результат гри" },
+  { command: "leaderboard", description: "Топ рейтинг" },
+  { command: "history", description: "Моя історія ігор" },
+]);
+
+async function replyWithMenu(ctx: any, text: string) {
+  return ctx.reply(text, { reply_markup: mainMenu });
+}
 
 async function notifyModerator(ctx: MyContext, text: string) {
   if (!MOD_CHAT_ID) return;
@@ -79,6 +98,10 @@ async function registerConversation(conversation: any, ctx: MyContext) {
     ctx,
     `👤 New player registered\n• nickname: ${p.nickname}\n• telegramId: ${telegramId}\n• at: ${new Date().toISOString()}`
   );
+  await ctx.reply(
+    "✅ Реєстрація завершена!",
+    { reply_markup: mainMenu }
+  );
 }
 
 // ---------- /report conversation ----------
@@ -122,7 +145,7 @@ async function reportConversation(conversation: any, ctx: MyContext) {
 
     opponentId = data.split(":")[1];
   }
-
+  
   await ctx.reply("Результат для тебе:", {
     reply_markup: new InlineKeyboard()
       .text("Я виграв (1-0)", "result:A_WIN")
@@ -166,7 +189,70 @@ async function reportConversation(conversation: any, ctx: MyContext) {
         "Нехай опонент відкриє бота і натисне /start (або розблокує бота), після цього повтори /report."
     );
   }
+  await ctx.reply(
+    "Гру записано. Очікуємо підтвердження.",
+    { reply_markup: mainMenu }
+  );
 }
+
+async function onLeaderboard(ctx: MyContext) {
+  const top = await leaderboard(); // API виклик
+
+  if (!top.length) {
+    return ctx.reply("Поки що немає гравців.", { reply_markup: mainMenu });
+  }
+
+  const lines = top.map((p, i) =>
+    `${i + 1}. ${p.nickname} — ${p.currentElo}`
+  );
+
+  await ctx.reply(
+    "🏆 Рейтинг:\n" + lines.join("\n"),
+    { reply_markup: mainMenu }
+  );
+}
+
+async function onHistory(ctx: MyContext) {
+  const telegramId = String(ctx.from?.id);
+  const me = await getPlayerByTelegram(telegramId);
+  const history = await getPlayerHistory(me.id, 10);
+
+  if (!history.items.length) {
+    return ctx.reply(
+      "У тебе ще немає зіграних ігор.",
+      { reply_markup: mainMenu }
+    );
+  }
+
+  const lines = history.items.map((g) =>
+    `• vs ${g.opponent.nickname}: ${g.myScore}`
+  );
+
+  await ctx.reply(
+    "📜 Твоя історія:\n" + lines.join("\n"),
+    { reply_markup: mainMenu }
+  );
+}
+
+bot.command("history", onHistory);
+bot.hears("📜 Історія", onHistory);
+
+bot.command("register", async (ctx) => {
+  await ctx.conversation.enter("registerConversation");
+});
+bot.hears("📝 Реєстрація", async (ctx) => {
+  await ctx.conversation.enter("registerConversation");
+});
+
+bot.command("report", async (ctx) => {
+  await ctx.conversation.enter("reportConversation");
+});
+
+bot.hears("♟️ Занести гру", async (ctx) => {
+  await ctx.conversation.enter("reportConversation");
+});
+
+
 
 // register conversations
 bot.use(createConversation(registerConversation));
@@ -174,7 +260,7 @@ bot.use(createConversation(reportConversation));
 
 // commands
 bot.command("start", async (ctx) => {
-  await ctx.reply("Привіт! Вітаю в спільноті SISCA!\nМи тут в Сквоті постійно граємо в шахи один з одним і вирішили об'єднати всіх одним ком'юніті та одним рейтингом. Правила прості: граєш гру в Сквоті, заносиш результат за допомогою /report.\nОбидва гравці мають бути зареєстровані через /register.\nТакож можна подивитись /leaderboard та /history\nЗа всіма питаннями звертайся до @ombabadugunda");
+  await replyWithMenu(ctx, "Привіт! Вітаю в спільноті SISCA!\nМи тут в Сквоті постійно граємо в шахи один з одним і вирішили об'єднати всіх одним ком'юніті та одним рейтингом. Правила прості: граєш гру в Сквоті, заносиш результат за допомогою /report.\nОбидва гравці мають бути зареєстровані через /register.\nТакож можна подивитись /leaderboard та /history\nЗа всіма питаннями звертайся до @ombabadugunda");
 });
 
 bot.command("help", async (ctx) => {
@@ -193,19 +279,8 @@ bot.command("report", async (ctx) => {
   await ctx.conversation.enter("reportConversation");
 });
 
-bot.command("leaderboard", async (ctx) => {
-  try {
-    const top = await leaderboard();
-    if (!top.length) return ctx.reply("Поки що немає гравців.");
-
-    const lines = top.map(
-      (p, i) => `${String(i + 1).padStart(2, " ")}. ${p.nickname} — ${p.currentElo} (${p.gamesPlayed} ігор)`
-    );
-    await ctx.reply("🏆 Топ-20:\n" + lines.join("\n"));
-  } catch (e: any) {
-    await ctx.reply(`Помилка: ${e.message}`);
-  }
-});
+bot.command("leaderboard", onLeaderboard);
+bot.hears("🏆 Рейтинг", onLeaderboard);
 
 bot.command("history", async (ctx) => {
   const telegramId = String(ctx.from?.id ?? "");
