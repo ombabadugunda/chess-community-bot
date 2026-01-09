@@ -208,8 +208,9 @@ async function onLeaderboard(ctx: MyContext) {
   }
 
   const lines = top.map((p, i) =>
-    `${i + 1}. ${p.nickname} — ${p.currentElo}`
+  `${String(i + 1).padStart(2, " ")}. ${p.nickname} — ${p.currentElo} (${p.gamesPlayed} ігор)`
   );
+
 
   await ctx.reply(
     "🏆 Рейтинг:\n" + lines.join("\n"),
