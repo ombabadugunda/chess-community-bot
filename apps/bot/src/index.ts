@@ -33,6 +33,11 @@ const bot = new Bot<MyContext>(token);
 bot.use(session({ initial: (): SessionData => ({}) }));
 bot.use(conversations());
 
+// register conversations
+bot.use(createConversation(registerConversation));
+bot.use(createConversation(reportConversation));
+
+
 await bot.api.setMyCommands([
   { command: "start", description: "Показати меню" },
   { command: "register", description: "Реєстрація гравця" },
@@ -253,10 +258,6 @@ bot.hears("♟️ Занести гру", async (ctx) => {
 });
 
 
-
-// register conversations
-bot.use(createConversation(registerConversation));
-bot.use(createConversation(reportConversation));
 
 // commands
 bot.command("start", async (ctx) => {
